@@ -1,8 +1,9 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
 import requests
 
 GRAPHOPPER_API_KEY = "94cc9301-76da-4df6-9912-fbf7a84a86e6"
 GRAPHOPPER_URL = "https://graphhopper.com/api/1/geocode"
-OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 
 def validate_city(city_name):
     """Validate city using GraphHopper API and return coordinates + name"""
@@ -30,43 +31,37 @@ def validate_city(city_name):
     lon = hits[0]["point"]["lng"]
     return (city, country, lat, lon), None
 
-def get_weather(lat, lon, unit="metric"):
-    """Fetch weather from Open-Meteo API in metric or imperial units"""
-    temp_unit = "fahrenheit" if unit == "imperial" else "celsius"
-    params = {
-        "latitude": lat,
-        "longitude": lon,
-        "current_weather": True,
-        "temperature_unit": temp_unit
-    }
-    response = requests.get(OPEN_METEO_URL, params=params)
-    if response.status_code != 200:
-        return None, f"Weather API error: {response.status_code}"
-    data = response.json()
-    if "current_weather" not in data:
-        return None, "No weather data available."
-    temp = data["current_weather"]["temperature"]
-    return temp, None
-
-# ======= Main Program =======
-while True:
-    city_input = input("Enter a city name: ").strip()
+def check_city():
+    city_input = entry_city.get().strip()
     city_info, err = validate_city(city_input)
     if err:
-        print(err)
-    else:
-        break
+        messagebox.showerror("Error", err)
+        return
 
-unit_choice = input("Choose units (metric/imperial): ").strip().lower()
-if unit_choice not in ["metric", "imperial"]:
-    print("⚠ Invalid choice, defaulting to metric.")
-    unit_choice = "metric"
+    city, country, lat, lon = city_info
+    result_text.set(f"✅ City found: {city}, {country}\nLatitude: {lat}, Longitude: {lon}")
 
-city, country, lat, lon = city_info
-temp, err = get_weather(lat, lon, unit_choice)
-if err:
-    print(err)
-else:
-    unit_label = "°C" if unit_choice == "metric" else "°F"
-    print(f"✅ City found: {city}, {country}")
-    print(f"🌡 Temperature: {temp} {unit_label}")
+def clear_fields():
+    entry_city.delete(0, tk.END)
+    result_text.set("")
+
+# GUI Setup
+root = tk.Tk()
+root.title("City Validation")
+root.geometry("400x200")
+root.resizable(False, False)
+
+frame = ttk.Frame(root, padding=10)
+frame.pack(fill="both", expand=True)
+
+ttk.Label(frame, text="City:").grid(row=0, column=0, sticky="w")
+entry_city = ttk.Entry(frame, width=30)
+entry_city.grid(row=0, column=1, pady=5)
+
+ttk.Button(frame, text="Validate City", command=check_city).grid(row=1, column=0, columnspan=2, pady=5)
+ttk.Button(frame, text="Clear", command=clear_fields).grid(row=2, column=0, columnspan=2)
+
+result_text = tk.StringVar()
+ttk.Label(frame, textvariable=result_text, foreground="blue", justify="left").grid(row=3, column=0, columnspan=2, pady=10)
+
+root.mainloop()
