@@ -108,6 +108,15 @@ class RouteFinder(QWidget):
         self.entry_fuel_price = QLineEdit("75.0")
         grid.addWidget(self.entry_fuel_price, 5, 1)
 
+        grid.addWidget(QLabel("Temp Unit:"), 6, 0)
+        self.combo_temp_unit = QComboBox()
+        self.combo_temp_unit.addItems(["celsius", "fahrenheit"])
+        grid.addWidget(self.combo_temp_unit, 6, 1)
+
+        self.weather_label = QLabel("Weather: --")
+        self.weather_label.setFont(QFont("Segoe UI", 10))
+        left_panel.addWidget(self.weather_label)
+
         left_panel.addLayout(grid)
 
         # --- Buttons ---
@@ -220,6 +229,7 @@ class RouteFinder(QWidget):
 
                 coords = polyline.decode(path["points"])
                 self.load_map(coords, (start_lat, start_lng), (end_lat, end_lng))
+                self.get_weather(end_lat, end_lng) 
             else:
                 self.result_label.setText("Error: Could not find a route.")
         except Exception as e:
@@ -248,6 +258,30 @@ class RouteFinder(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Map Load Error", f"Could not load map: {str(e)}")
 
+    def get_weather(self, lat, lon):
+        """Fetch weather for the destination using Open-Meteo API."""
+        unit = self.combo_temp_unit.currentText()
+        
+        params = {
+            "latitude": lat,
+            "longitude": lon,
+            "current_weather": "true",
+            "temperature_unit": unit
+        }
+        
+        try:
+            response = requests.get("https://api.open-meteo.com/v1/forecast", params=params, timeout=15)
+            response.raise_for_status()  # Raise an exception for bad status codes
+            
+            data = response.json()
+            temp = data["current_weather"]["temperature"]
+            unit_symbol = "°C" if unit == "celsius" else "°F"
+            
+            self.weather_label.setText(f"Weather at Destination: {temp}{unit_symbol}")
+            
+        except requests.RequestException as e:
+            self.weather_label.setText("Weather: Could not retrieve data.")
+            print(f"Weather API error: {e}")
 
     def clear_fields(self):
         self.entry_start.clear()
@@ -266,7 +300,6 @@ class RouteFinder(QWidget):
              QMessageBox.warning(self, "Download Error", "Please generate a route first.")
              return
         download_route(self.entry_start, self.entry_end, self.combo_vehicle, self.result_label, self.table)
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
