@@ -1,0 +1,91 @@
+Route Information
+=================
+Start: Manila 
+End: Malolos
+Vehicle: bike
+
+<b>Fastest Route</b>
+Distance: 40.63 km
+Estimated Time: 134.6 minutes
+
+Step-by-Step Directions:
+-------------------------
+Step   Instruction                                                  Distance (km)
+================================================================================
+1      Continue                                                           0.02
+2      Turn right onto Victoria Street                                    0.20
+3      Turn right onto Muralla Street                                     0.43
+4      Keep left                                                          0.04
+5      Turn right onto Anda Street                                        0.01
+6      Turn left onto Muralla Street                                      0.30
+7      Turn sharp right onto Magallanes Drive                             0.25
+8      Turn left                                                          0.06
+9      Turn left onto Riverside Drive                                     0.05
+10     Keep right onto Binondo-Intramuros Bridge                          0.64
+11     Turn right onto Rentas Street                                      0.01
+12     Turn left onto Muelle de Binondo                                   0.12
+13     Turn right                                                         0.06
+14     Turn slight left onto Quintin Paredes Road                         0.01
+15     Turn right onto Norberto Ty Street                                 0.15
+16     Turn right onto E. T. Yuchengco Street                             0.04
+17     Turn left onto Ongpin Street                                       0.12
+18     Turn left onto Salazar Street                                      0.08
+19     Turn right onto Benavidez Street                                   0.87
+20     Turn right onto Masangkay Street                                   0.08
+21     Turn left onto Mayhaligue Street                                   0.39
+22     Turn sharp right onto Bambang Street                               0.05
+23     Turn sharp left onto Yakal Street                                  0.56
+24     Turn right onto Almeda Street                                      0.75
+25     Turn sharp left onto Old Antipolo Street                           0.06
+26     Turn right onto Abad Santos Avenue                                 0.04
+27     Turn left onto Antipolo Street                                     0.20
+28     Turn right onto New Antipolo Street                                0.31
+29     Turn left onto Solis Street                                        0.02
+30     Turn right onto Molave Street                                      0.34
+31     Turn right onto Corregidor Street                                  0.06
+32     Turn left onto Limay Street                                        1.26
+33     Turn right onto 2nd Avenue                                         0.16
+34     Turn left onto D. Aquino Street                                    0.31
+35     Turn left onto 4th Avenue                                          0.42
+36     Turn right onto A. Mabini Street                                   0.31
+37     Turn right onto M. Francisco Street                                0.08
+38     Turn left onto P. Zamora Street                                    0.59
+39     Turn right onto 10th Avenue                                        0.04
+40     Turn left onto Torres Bugallon Street                              0.60
+41     Turn left onto E. Jacinto Street                                   0.12
+42     Turn right onto A. Mabini Street                                   0.66
+43     Turn sharp left onto Dr. Lazcano Street                            0.05
+44     Turn right onto Bronze Street                                      0.63
+45     Turn left onto M. H. del Pilar Street                              0.73
+46     Turn right onto Villiarba Street                                   0.02
+47     Turn left onto Kaybasco Street                                     0.14
+48     Turn left onto Sanchez Street                                      0.06
+49     Turn right onto M. H. del Pilar Street                             0.16
+50     Turn right onto Yanga Street                                       1.26
+51     Turn left onto V. Custodio Street                                  0.19
+52     Turn left onto M. Santos Street                                    0.38
+53     Turn left onto Rodriguez Street                                    0.14
+54     Turn right onto Mulawin Street                                     0.21
+55     Turn left onto Luis Street                                         0.05
+56     Turn right onto Panghulo Road                                      2.50
+57     Turn left onto F. Lumabas Street                                   0.72
+58     Turn right onto Diego Street                                       0.04
+59     Turn left onto J. P. Rizal Street                                  0.09
+60     Turn right onto Burgos Street                                      0.03
+61     Continue onto Zamora Street                                        0.29
+62     Turn right onto J. P. Rizal Street                                 8.34
+63     Turn left onto Nia Road                                            2.37
+64     Turn right                                                         0.06
+65     Turn slight left                                                   2.79
+66     Keep left                                                          1.20
+67     Turn slight right                                                  0.16
+68     Turn sharp left onto Malolos-Bulakan Road                          5.87
+69     Turn right onto Dimagiba Street                                    0.07
+70     Turn left onto Canlapan Street                                     0.35
+71     Turn right onto Sampaguita Street                                  0.07
+72     Turn left onto Tubigan Street                                      0.40
+73     Continue onto L. Valencia Street                                   0.23
+74     Turn left onto Tanjeco Street                                      0.14
+75     Turn right onto Paseo del Congreso                                 0.02
+76     Turn sharp left                                                    0.01
+77     Arrive at destination                                              0.00

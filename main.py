@@ -88,7 +88,7 @@ class RouteFinder(QWidget):
         self.entry_end = QLineEdit(placeholderText="e.g., Quezon City")
         grid.addWidget(self.entry_end, 1, 1)
 
-        grid.addWidget(QLabel("Vehicle:"), 2, 0)
+        grid.addWidget(QLabel("Mode of Transport:"), 2, 0)
         self.combo_vehicle = QComboBox()
         self.combo_vehicle.addItems(["car", "bike", "foot"])
         self.combo_vehicle.currentTextChanged.connect(self.on_vehicle_change)
@@ -116,9 +116,12 @@ class RouteFinder(QWidget):
 
         self.weather_label = QLabel("Weather: --")
         self.weather_label.setFont(QFont("Segoe UI", 10))
+
+        
         left_panel.addWidget(self.weather_label)
 
         left_panel.addLayout(grid)
+
 
         # --- Buttons ---
         btn_layout = QHBoxLayout()
@@ -149,6 +152,10 @@ class RouteFinder(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.verticalHeader().setVisible(False) # <-- ADD THIS LINE
         self.table.setStyleSheet("""
+            QTableWidget {
+                background-color: white;
+                color: black;
+            }
             QHeaderView::section {
                 background-color: #442d26;
                 color: white;
@@ -157,7 +164,18 @@ class RouteFinder(QWidget):
                 border: none;
             }
         """)
+
         left_panel.addWidget(self.table)
+
+        # ✅ Input fields style should be here (after they’re created above)
+        self.entry_start.setStyleSheet("background-color: white; color: black;")
+        self.entry_end.setStyleSheet("background-color: white; color: black;")
+        self.entry_fuel_economy.setStyleSheet("background-color: white; color: black;")
+        self.entry_fuel_price.setStyleSheet("background-color: white; color: black;")
+
+        self.combo_vehicle.setStyleSheet("background-color: white; color: black;")
+        self.combo_mode.setStyleSheet("background-color: white; color: black;")
+        self.combo_temp_unit.setStyleSheet("background-color: white; color: black;")
 
         # --- Map View ---
         self.map_view = QWebEngineView()
@@ -224,9 +242,18 @@ class RouteFinder(QWidget):
                 instructions = path["instructions"]
                 self.table.setRowCount(len(instructions))
                 for i, step in enumerate(instructions):
-                    self.table.setItem(i, 0, QTableWidgetItem(str(i + 1)))
+                    # Step column (center aligned)
+                    step_item = QTableWidgetItem(str(i + 1))
+                    step_item.setTextAlignment(Qt.AlignCenter)
+                    self.table.setItem(i, 0, step_item)
+
+                    # Instruction column (default left alignment)
                     self.table.setItem(i, 1, QTableWidgetItem(step["text"]))
-                    self.table.setItem(i, 2, QTableWidgetItem(f"{step['distance'] / 1000:.2f}"))
+
+                    # Distance column (center aligned with "km")
+                    dist_item = QTableWidgetItem(f"{step['distance'] / 1000:.2f} km")
+                    dist_item.setTextAlignment(Qt.AlignCenter)
+                    self.table.setItem(i, 2, dist_item)
 
                 coords = polyline.decode(path["points"])
                 self.load_map(coords, (start_lat, start_lng), (end_lat, end_lng))
@@ -300,7 +327,7 @@ class RouteFinder(QWidget):
         if not self.entry_start.text() or not self.entry_end.text():
              QMessageBox.warning(self, "Download Error", "Please generate a route first.")
              return
-        download_route(self.entry_start, self.entry_end, self.combo_vehicle, self.result_label, self.table)
+        download_route(self.entry_start, self.entry_end, self.combo_vehicle, self.result_label, self.table, self.combo_mode, self.weather_label)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
