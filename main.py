@@ -18,6 +18,7 @@ from route_downloads import download_route
 
 # GraphHopper API Key from RouteOptimization.txt
 API_KEY = "2e2cf02b-63b2-456a-a2d1-e1d04d28d6d1"
+OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 
 # --- Helper Functions (from RouteOptimization.txt) ---
 def geocode(location: str):
