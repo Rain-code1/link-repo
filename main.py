@@ -137,6 +137,7 @@ class RouteFinder(QWidget):
         self.table = QTableWidget(columnCount=3)
         self.table.setHorizontalHeaderLabels(["Step", "Instruction", "Distance (km)"])
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.table.verticalHeader().setVisible(False) # <-- ADD THIS LINE
         self.table.setStyleSheet("""
             QHeaderView::section {
                 background-color: #442d26;
@@ -210,14 +211,12 @@ class RouteFinder(QWidget):
 
                 self.result_label.setText(f"<b>{mode} Route</b>\nDistance: {distance:.2f} km\nEstimated Time: {time:.1f} minutes{fuel_text}")
 
-                # --- FIX START: Corrected table population logic ---
                 instructions = path["instructions"]
                 self.table.setRowCount(len(instructions))
                 for i, step in enumerate(instructions):
                     self.table.setItem(i, 0, QTableWidgetItem(str(i + 1)))
                     self.table.setItem(i, 1, QTableWidgetItem(step["text"]))
                     self.table.setItem(i, 2, QTableWidgetItem(f"{step['distance'] / 1000:.2f}"))
-                # --- FIX END ---
 
                 coords = polyline.decode(path["points"])
                 self.load_map(coords, (start_lat, start_lng), (end_lat, end_lng))
