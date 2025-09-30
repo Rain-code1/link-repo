@@ -1,0 +1,31 @@
+Route Information
+=================
+Start: Manila 
+End: Malolos
+Vehicle: car
+
+Distance: 44.22 km
+Estimated Time: 42.41 minutes
+
+Step-by-Step Directions:
+-------------------------
+Step   Instruction                                                  Distance (km)
+================================================================================
+1      Continue onto Victoria Street                                      0.02
+2      Turn sharp right onto Padre Burgos Avenue                          0.04
+3      Keep left onto Taft Avenue                                         0.48
+4      Turn sharp right onto Finance Road                                 0.25
+5      Turn right onto Padre Burgos Avenue                                0.77
+6      Keep left onto MacArthur Bridge and drive toward Santa Cruz        0.79
+7      Turn left onto Rizal Avenue                                        5.20
+8      Turn right onto C-3 Road and drive toward Sergeant Rivera          1.10
+9      Turn left onto Andres Bonifacio Avenue                             1.49
+10     Keep left onto Andres Bonifacio Avenue                             0.25
+11     Keep left onto North Luzon Expressway and drive toward Baguio       2.01
+12     Keep left onto North Luzon Expressway                             20.99
+13     Keep right onto Tabang Spur Road and drive toward Tabang, Guiguinto, Malolos       9.17
+14     Turn left onto Fausta                                              0.46
+15     Turn right onto Lucero Street                                      0.54
+16     Turn right                                                         0.40
+17     Turn left onto Paseo del Congreso                                  0.27
+18     Arrive at destination                                              0.00
