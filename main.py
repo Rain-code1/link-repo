@@ -1,227 +1,273 @@
-import tkinter as tk
-from tkinter import ttk, messagebox
-import requests
+import sys
+import polyline
+import json
 import urllib.parse
-from route_downloads import download_route  # Modular download logic
+import requests
 
-# GraphHopper API Key
-API_KEY = "2ed9d9ad-9c16-42db-9afc-ae3c69373316" # It's recommended to use the key from the new file: "2e2cf02b-63b2-456a-a2d1-e1d04d28d6d1"
+from PySide6.QtWidgets import (
+    QApplication, QWidget, QLabel, QLineEdit, QComboBox, QPushButton,
+    QVBoxLayout, QGridLayout, QMessageBox, QTableWidget, QTableWidgetItem,
+    QHeaderView, QHBoxLayout, QSplitter
+)
+from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt
+from PySide6.QtWebEngineWidgets import QWebEngineView
 
-# --- Helper Functions ---
-def geocode(location: str): 
-    url = f"https://graphhopper.com/api/1/geocode?q={urllib.parse.quote(location)}&limit=1&key={API_KEY}" 
-    r = requests.get(url, timeout=30) 
-    r.raise_for_status() 
-    data = r.json() 
-    if data.get("hits"): 
-        p = data["hits"][0]["point"] 
-        return p["lat"], p["lng"] 
-    return None, None 
+# It's recommended to place this in a separate file for modularity
+from route_downloads import download_route
 
-def call_route(start_lat, start_lng, end_lat, end_lng, vehicle, shortest=False): 
-    base = "https://graphhopper.com/api/1/route" 
-    params = [ 
-        ("point", f"{start_lat},{start_lng}"), 
-        ("point", f"{end_lat},{end_lng}"), 
-        ("vehicle", vehicle), 
-        ("locale", "en"), 
-        ("points_encoded", "false"), 
-        ("key", API_KEY), 
+# GraphHopper API Key from RouteOptimization.txt
+API_KEY = "2e2cf02b-63b2-456a-a2d1-e1d04d28d6d1"
+
+# --- Helper Functions (from RouteOptimization.txt) ---
+def geocode(location: str):
+    url = f"https://graphhopper.com/api/1/geocode?q={urllib.parse.quote(location)}&limit=1&key={API_KEY}"
+    try:
+        r = requests.get(url, timeout=30)
+        r.raise_for_status()
+        data = r.json()
+        if data.get("hits"):
+            p = data["hits"][0]["point"]
+            return p["lat"], p["lng"]
+    except requests.RequestException as e:
+        print(f"Geocoding error: {e}")
+    return None, None
+
+def call_route(start_lat, start_lng, end_lat, end_lng, vehicle, shortest=False):
+    base = "https://graphhopper.com/api/1/route"
+    params = [
+        ("point", f"{start_lat},{start_lng}"),
+        ("point", f"{end_lat},{end_lng}"),
+        ("vehicle", vehicle),
+        ("locale", "en"),
+        ("points_encoded", "true"), # Use encoded for smaller response
+        ("key", API_KEY),
     ]
-    if shortest: 
-        params.append(("ch.disable", "true")) 
-        params.append(("weighting", "shortest")) 
+    if shortest:
+        params.append(("ch.disable", "true"))
+        params.append(("weighting", "shortest"))
 
-    r = requests.get(base, params=params, timeout=45) 
+    r = requests.get(base, params=params, timeout=45)
 
-    if shortest and r.status_code != 200: 
-        params = [ 
-            ("point", f"{start_lat},{start_lng}"), 
-            ("point", f"{end_lat},{end_lng}"), 
-            ("vehicle", vehicle), 
-            ("locale", "en"), 
-            ("points_encoded", "false"), 
-            ("key", API_KEY), 
-        ]
-        r = requests.get(base, params=params, timeout=45) 
+    if shortest and r.status_code != 200: # Fallback for unsupported shortest path
+        params = [p for p in params if p[0] not in ("ch.disable", "weighting")]
+        r = requests.get(base, params=params, timeout=45)
 
-    r.raise_for_status() 
-    return r.json() 
+    r.raise_for_status()
+    return r.json()
 
-def estimate_fuel(distance_km: float, l_per_100: float): 
+def estimate_fuel(distance_km: float, l_per_100: float):
     try:
-        return (distance_km * float(l_per_100)) / 100.0 
-    except Exception:
-        return None 
+        return (distance_km * float(l_per_100)) / 100.0
+    except (ValueError, TypeError):
+        return None
 
-# --- UI Actions ---
-def on_vehicle_change(_=None): 
-    is_car = combo_vehicle.get() == "car" 
-    state = "normal" if is_car else "disabled"
-    fuel_label.configure(state=state) 
-    entry_fuel_economy.configure(state=state) 
-    # Add new price fields to the state change
-    price_label.configure(state=state)
-    entry_fuel_price.configure(state=state)
+# --- Main Application Class ---
+class RouteFinder(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Link - Route Finder and Optimizer")
+        self.setFixedSize(1200, 700)
+        self.setStyleSheet("background-color: #ecddd4; color: black;")
+        self.init_ui()
+        self.on_vehicle_change() # Set initial state
 
+    def init_ui(self):
+        main_layout = QHBoxLayout(self)
+        left_panel = QVBoxLayout()
+        grid = QGridLayout()
+        grid.setSpacing(10)
 
-def get_route():
-    start = entry_start.get().strip() 
-    end = entry_end.get().strip() 
-    vehicle = combo_vehicle.get() 
-    mode = mode_var.get() 
-    l100 = entry_fuel_economy.get().strip() 
-    price_str = entry_fuel_price.get().strip()
+        # --- Input Fields ---
+        grid.addWidget(QLabel("Starting Location:"), 0, 0)
+        self.entry_start = QLineEdit(placeholderText="e.g., Manila")
+        grid.addWidget(self.entry_start, 0, 1)
 
-    if not start or not end: 
-        messagebox.showwarning("Input Error", "Please enter both start and destination.") 
-        return
+        grid.addWidget(QLabel("Destination:"), 1, 0)
+        self.entry_end = QLineEdit(placeholderText="e.g., Quezon City")
+        grid.addWidget(self.entry_end, 1, 1)
 
-    try:
-        start_lat, start_lng = geocode(start) 
-        end_lat, end_lng = geocode(end) 
+        grid.addWidget(QLabel("Vehicle:"), 2, 0)
+        self.combo_vehicle = QComboBox()
+        self.combo_vehicle.addItems(["car", "bike", "foot"])
+        self.combo_vehicle.currentTextChanged.connect(self.on_vehicle_change)
+        grid.addWidget(self.combo_vehicle, 2, 1)
 
-        if start_lat is None or end_lat is None: 
-            result_text.set("Error: Could not geocode one of the locations.") 
-            clear_table()
+        grid.addWidget(QLabel("Optimization:"), 3, 0)
+        self.combo_mode = QComboBox()
+        self.combo_mode.addItems(["Fastest", "Fuel-Efficient"])
+        grid.addWidget(self.combo_mode, 3, 1)
+
+        self.label_fuel_economy = QLabel("Car L/100 km:")
+        grid.addWidget(self.label_fuel_economy, 4, 0)
+        self.entry_fuel_economy = QLineEdit("8.0")
+        grid.addWidget(self.entry_fuel_economy, 4, 1)
+
+        self.label_fuel_price = QLabel("Fuel Price (per L):")
+        grid.addWidget(self.label_fuel_price, 5, 0)
+        self.entry_fuel_price = QLineEdit("75.0")
+        grid.addWidget(self.entry_fuel_price, 5, 1)
+
+        left_panel.addLayout(grid)
+
+        # --- Buttons ---
+        btn_layout = QHBoxLayout()
+        self.btn_route = QPushButton("Get Route")
+        self.btn_route.clicked.connect(self.get_route)
+        self.btn_route.setStyleSheet("background-color: #2e7d32; color: white; font-weight: 600; padding: 6px 12px; border-radius: 4px;")
+        btn_layout.addWidget(self.btn_route)
+
+        self.btn_download = QPushButton("Download")
+        self.btn_download.clicked.connect(self.download)
+        self.btn_download.setStyleSheet("background-color: #f9a825; color: white; font-weight: 600; padding: 6px 12px; border-radius: 4px;")
+        btn_layout.addWidget(self.btn_download)
+
+        self.btn_clear = QPushButton("Clear")
+        self.btn_clear.clicked.connect(self.clear_fields)
+        self.btn_clear.setStyleSheet("background-color: #c62828; color: white; font-weight: 600; padding: 6px 12px; border-radius: 4px;")
+        btn_layout.addWidget(self.btn_clear)
+        left_panel.addLayout(btn_layout)
+
+        # --- Results and Table ---
+        self.result_label = QLabel("")
+        self.result_label.setStyleSheet("color: black;")
+        self.result_label.setFont(QFont("Segoe UI", 10))
+        left_panel.addWidget(self.result_label)
+
+        self.table = QTableWidget(columnCount=3)
+        self.table.setHorizontalHeaderLabels(["Step", "Instruction", "Distance (km)"])
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.table.setStyleSheet("""
+            QHeaderView::section {
+                background-color: #442d26;
+                color: white;
+                font-weight: 600;
+                padding: 4px;
+                border: none;
+            }
+        """)
+        left_panel.addWidget(self.table)
+
+        # --- Map View ---
+        self.map_view = QWebEngineView()
+        self.load_map()
+
+        # --- Splitter Layout ---
+        splitter = QSplitter(Qt.Horizontal)
+        left_widget = QWidget()
+        left_widget.setLayout(left_panel)
+        splitter.addWidget(left_widget)
+        splitter.addWidget(self.map_view)
+        splitter.setSizes([500, 700])
+        main_layout.addWidget(splitter)
+
+    def on_vehicle_change(self):
+        is_car = self.combo_vehicle.currentText() == "car"
+        self.label_fuel_economy.setVisible(is_car)
+        self.entry_fuel_economy.setVisible(is_car)
+        self.label_fuel_price.setVisible(is_car)
+        self.entry_fuel_price.setVisible(is_car)
+        self.combo_mode.setEnabled(is_car) # Optimization only for car
+
+    def get_route(self):
+        start = self.entry_start.text().strip()
+        end = self.entry_end.text().strip()
+        vehicle = self.combo_vehicle.currentText()
+        mode = self.combo_mode.currentText()
+
+        if not start or not end:
+            QMessageBox.warning(self, "Input Error", "Please enter both start and destination.")
             return
 
-        shortest = (mode == "shortest") 
-        data = call_route(start_lat, start_lng, end_lat, end_lng, vehicle, shortest=shortest) 
-        
-        if not data.get("paths", []): 
-            result_text.set("Error: Could not find route.") 
-            clear_table()
-            return
+        try:
+            start_lat, start_lng = geocode(start)
+            end_lat, end_lng = geocode(end)
 
-        path = data["paths"][0] 
-        distance_km = (path.get("distance", 0) or 0) / 1000.0 
-        time_min = (path.get("time", 0) or 0) / 60000.0 
-
-        # Fuel and cost estimate for cars only
-        fuel_txt = "" 
-        if vehicle == "car": 
-            try:
-                fuel_l = estimate_fuel(distance_km, float(l100)) 
-                fuel_price = float(price_str)
-                if fuel_l is not None: 
-                    cost = fuel_l * fuel_price
-                    fuel_txt = f"\nEstimated Fuel: {fuel_l:.2f} L | Est. Cost: ₱{cost:.2f}" 
-            except (ValueError, TypeError):
-                messagebox.showwarning("Input Error", "Please enter valid numbers for L/100 km and Fuel Price.")
+            if start_lat is None or end_lat is None:
+                self.result_label.setText("Error: Could not geocode one of the locations.")
+                self.table.setRowCount(0)
                 return
 
+            shortest = (mode == "Fuel-Efficient")
+            data = call_route(start_lat, start_lng, end_lat, end_lng, vehicle, shortest)
 
-        label = "Fastest (time)" if not shortest else "Fuel-Efficient (shortest distance)" 
-        result_text.set( 
-            f"{label}\nDistance: {distance_km:.2f} km\nTime: {time_min:.1f} min{fuel_txt}" 
-        )
+            if "paths" in data:
+                path = data["paths"][0]
+                distance = path["distance"] / 1000
+                time = path["time"] / 60000
 
-        clear_table()
-        instructions = path["instructions"]
-        for i, step in enumerate(instructions, start=1):
-            text = step["text"]
-            dist_km = step["distance"] / 1000
-            directions_table.insert("", "end", values=(i, text, f"{dist_km:.2f}"))
+                # Fuel and cost calculation
+                fuel_text = ""
+                if vehicle == "car":
+                    fuel_l = estimate_fuel(distance, self.entry_fuel_economy.text())
+                    if fuel_l is not None:
+                        try:
+                            price = float(self.entry_fuel_price.text())
+                            cost = fuel_l * price
+                            fuel_text = f"\nEstimated Fuel: {fuel_l:.2f} L | Est. Cost: ₱{cost:.2f}"
+                        except ValueError:
+                            fuel_text = "\nInvalid fuel price."
 
-    except requests.HTTPError as e: 
-        result_text.set(f"HTTP error: {e}") 
-        clear_table()
-    except Exception as e: 
-        result_text.set(f"Error: {str(e)}") 
-        clear_table()
+                self.result_label.setText(f"<b>{mode} Route</b>\nDistance: {distance:.2f} km\nEstimated Time: {time:.1f} minutes{fuel_text}")
 
-def clear_table():
-    for row in directions_table.get_children():
-        directions_table.delete(row)
+                # --- FIX START: Corrected table population logic ---
+                instructions = path["instructions"]
+                self.table.setRowCount(len(instructions))
+                for i, step in enumerate(instructions):
+                    self.table.setItem(i, 0, QTableWidgetItem(str(i + 1)))
+                    self.table.setItem(i, 1, QTableWidgetItem(step["text"]))
+                    self.table.setItem(i, 2, QTableWidgetItem(f"{step['distance'] / 1000:.2f}"))
+                # --- FIX END ---
 
-def clear_fields():
-    entry_start.delete(0, tk.END) 
-    entry_end.delete(0, tk.END) 
-    combo_vehicle.set("car") 
-    mode_var.set("fastest") 
-    entry_fuel_economy.delete(0, tk.END) 
-    entry_fuel_economy.insert(0, "8.0") 
-    entry_fuel_price.delete(0, tk.END)
-    entry_fuel_price.insert(0, "75.0") # Set default price
-    result_text.set("") 
-    clear_table()
-    on_vehicle_change() 
+                coords = polyline.decode(path["points"])
+                self.load_map(coords, (start_lat, start_lng), (end_lat, end_lng))
+            else:
+                self.result_label.setText("Error: Could not find a route.")
+        except Exception as e:
+            self.result_label.setText(f"An error occurred: {e}")
 
-# === Main window ===
-root = tk.Tk()
-root.title("Route Finder and Optimizer")
-root.geometry("700x680") # Adjusted height
-root.resizable(False, False)
+    def load_map(self, route_coords=None, start=None, end=None):
+        route_js = ""
+        if route_coords:
+            route_js += f"var route = {json.dumps(route_coords)};\n"
+            route_js += "var polyline = L.polyline(route, {color: 'blue'}).addTo(map);\n"
+            route_js += "map.fitBounds(polyline.getBounds());\n"
+        if start and end:
+            # --- FIX START: Correctly format coordinates for JavaScript ---
+            route_js += f"L.marker([{start[0]}, {start[1]}]).addTo(map).bindPopup('Start').openPopup();\n"
+            route_js += f"L.marker([{end[0]}, {end[1]}]).addTo(map).bindPopup('End');\n"
+            # --- FIX END ---
 
-frame = ttk.Frame(root, padding=10)
-frame.pack(fill="both", expand=True)
+        try:
+            # Assumes map_template.html is in the same directory
+            with open("map_template.html", "r", encoding="utf-8") as file:
+                html = file.read().replace("// ROUTE_JS", route_js) # Ensure placeholder matches your HTML file
+            self.map_view.setHtml(html)
+        except FileNotFoundError:
+             QMessageBox.critical(self, "Error", "map_template.html not found.")
 
-# Input fields
-ttk.Label(frame, text="Starting Location:").grid(row=0, column=0, sticky="w")
-entry_start = ttk.Entry(frame, width=40)
-entry_start.grid(row=0, column=1, pady=5, sticky="w")
 
-ttk.Label(frame, text="Destination:").grid(row=1, column=0, sticky="w")
-entry_end = ttk.Entry(frame, width=40)
-entry_end.grid(row=1, column=1, pady=5, sticky="w")
+    def clear_fields(self):
+        self.entry_start.clear()
+        self.entry_end.clear()
+        self.combo_vehicle.setCurrentText("car")
+        self.combo_mode.setCurrentText("Fastest")
+        self.entry_fuel_economy.setText("8.0")
+        self.entry_fuel_price.setText("75.0")
+        self.result_label.setText("")
+        self.table.setRowCount(0)
+        self.load_map()
 
-ttk.Label(frame, text="Vehicle:").grid(row=2, column=0, sticky="w") 
-combo_vehicle = ttk.Combobox(frame, values=["car", "bike", "foot"], state="readonly") 
-combo_vehicle.set("car") 
-combo_vehicle.grid(row=2, column=1, pady=5, sticky="w")
-combo_vehicle.bind("<<ComboboxSelected>>", on_vehicle_change) 
+    def download(self):
+        # This function needs access to the UI elements
+        if not self.entry_start.text() or not self.entry_end.text():
+             QMessageBox.warning(self, "Download Error", "Please generate a route first.")
+             return
+        download_route(self.entry_start, self.entry_end, self.combo_vehicle, self.result_label, self.table)
 
-ttk.Label(frame, text="Optimization:").grid(row=3, column=0, sticky="w") 
-mode_var = tk.StringVar(value="fastest") 
-mode_box = ttk.Combobox( 
-    frame, textvariable=mode_var,
-    values=["fastest", "shortest"],
-    state="readonly"
-)
-mode_box.grid(row=3, column=1, pady=4, sticky="w") 
 
-fuel_label = ttk.Label(frame, text="Car L/100 km:") 
-fuel_label.grid(row=4, column=0, sticky="w") 
-entry_fuel_economy = ttk.Entry(frame, width=15) 
-entry_fuel_economy.grid(row=4, column=1, pady=5, sticky="w") 
-entry_fuel_economy.insert(0, "8.0") 
-
-# New Fuel Price field
-price_label = ttk.Label(frame, text="Fuel Price (per L):")
-price_label.grid(row=5, column=0, sticky="w")
-entry_fuel_price = ttk.Entry(frame, width=15)
-entry_fuel_price.grid(row=5, column=1, pady=5, sticky="w")
-entry_fuel_price.insert(0, "75.0") # A default value for Manila
-
-# Buttons
-btn_frame = ttk.Frame(frame)
-btn_frame.grid(row=6, column=0, columnspan=2, pady=10) # Adjusted row
-ttk.Button(btn_frame, text="Get Route", command=get_route).pack(side="left", padx=5) 
-ttk.Button(btn_frame, text="Clear", command=clear_fields).pack(side="left", padx=5) 
-ttk.Button(btn_frame, text="Download", command=lambda: download_route(entry_start, entry_end, combo_vehicle, result_text, directions_table)).pack(side="left", padx=5)
-
-# Result summary
-result_text = tk.StringVar()
-result_label = ttk.Label(frame, textvariable=result_text, foreground="blue", justify="left")
-result_label.grid(row=7, column=0, columnspan=2, pady=10, sticky="w") # Adjusted row
-
-# Table for directions
-table_frame = ttk.Frame(frame)
-table_frame.grid(row=8, column=0, columnspan=2, pady=5) # Adjusted row
-scrollbar = ttk.Scrollbar(table_frame, orient="vertical")
-scrollbar.pack(side="right", fill="y")
-directions_table = ttk.Treeview(table_frame, columns=("Step", "Instruction", "Distance"), show="headings", height=8, yscrollcommand=scrollbar.set)
-directions_table.heading("Step", text="Step")
-directions_table.heading("Instruction", text="Instruction")
-directions_table.heading("Distance", text="Distance (km)")
-directions_table.column("Step", width=60, anchor="center")
-directions_table.column("Instruction", width=460, anchor="w")
-directions_table.column("Distance", width=120, anchor="center")
-directions_table.pack(side="left", fill="x", expand=True)
-scrollbar.config(command=directions_table.yview)
-
-# Initialize UI state
-on_vehicle_change() 
-
-root.mainloop()
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = RouteFinder()
+    window.show()
+    sys.exit(app.exec())
