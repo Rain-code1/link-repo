@@ -12,11 +12,12 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QFont
 from PySide6.QtCore import Qt
 from PySide6.QtWebEngineWidgets import QWebEngineView
-
-# It's recommended to place this in a separate file for modularity
 from route_downloads import download_route
 
-# GraphHopper API Key from RouteOptimization.txt
+# =================================================================================
+# API KEYS
+# =================================================================================
+
 API_KEY = "2e2cf02b-63b2-456a-a2d1-e1d04d28d6d1"
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 
@@ -46,6 +47,27 @@ def geocode(location_name: str):
 
     point = hits[0]["point"]
     return (point["lat"], point["lng"]), None
+
+# =================================================================================
+# ROUTE OPTIMIZATION
+# =================================================================================
+
+"""
+Calls the GraphHopper Routing API to get a route between two points.
+
+Note: The 'avoid_tolls' functionality requires a premium GraphHopper plan.
+The free plan does not support the 'ch.disable=true' parameter, which is
+necessary for custom routing models like toll avoidance. The code is left here
+for future extension if the project upgrades to a paid plan.
+
+Args:
+    start_lat, start_lng (float): Coordinates for the starting point.
+    end_lat, end_lng (float): Coordinates for the destination.
+    vehicle (str): The mode of transport (e.g., "car", "bike").
+    avoid_tolls (bool): Flag to indicate if toll roads should be avoided.
+
+Returns:
+"""
 
 def call_route(start_lat, start_lng, end_lat, end_lng, vehicle, avoid_tolls=False):
     base = "https://graphhopper.com/api/1/route"
@@ -85,6 +107,21 @@ def call_route(start_lat, start_lng, end_lat, end_lng, vehicle, avoid_tolls=Fals
         if e.response is not None:
             print(f"API response: {e.response.text}")
         return {}
+    
+# =================================================================================
+# FUEL COST 
+# =================================================================================
+
+"""
+Calculates the estimated fuel needed for a given distance and fuel economy.
+
+Args:
+    distance_km (float): The total distance of the route in kilometers.
+    l_per_100 (float): The vehicle's fuel consumption in liters per 100 km.
+
+Returns:
+    float or None: The estimated fuel in liters, or None if the input is invalid.
+"""
 
 def estimate_fuel(distance_km: float, l_per_100: float):
     try:
@@ -92,7 +129,10 @@ def estimate_fuel(distance_km: float, l_per_100: float):
     except (ValueError, TypeError):
         return None
 
-# --- Main Application Class ---
+# =================================================================================
+# MAIN APPLICATION CLASS
+# =================================================================================
+
 class RouteFinder(QWidget):
     def __init__(self):
         super().__init__()
@@ -108,7 +148,10 @@ class RouteFinder(QWidget):
         grid = QGridLayout()
         grid.setSpacing(10)
 
-        # --- Input Fields ---
+# =================================================================================
+# INPUT FIELDS
+# =================================================================================
+
         grid.addWidget(QLabel("Starting Location:"), 0, 0)
         self.entry_start = QLineEdit(placeholderText="e.g., Manila")
         grid.addWidget(self.entry_start, 0, 1)
@@ -153,7 +196,10 @@ class RouteFinder(QWidget):
         left_panel.addLayout(grid)
 
 
-        # --- Buttons ---
+# =================================================================================
+# BUTTON LAYOUT 
+# =================================================================================
+
         btn_layout = QHBoxLayout()
         self.btn_route = QPushButton("Get Route")
         self.btn_route.clicked.connect(self.get_route)
@@ -171,7 +217,10 @@ class RouteFinder(QWidget):
         btn_layout.addWidget(self.btn_clear)
         left_panel.addLayout(btn_layout)
 
-        # --- Results and Table ---
+# =================================================================================
+# RESULT AND LAYOUT 
+# =================================================================================
+
         self.result_label = QLabel("")
         self.result_label.setStyleSheet("color: black;")
         self.result_label.setFont(QFont("Segoe UI", 10))
@@ -291,7 +340,18 @@ class RouteFinder(QWidget):
         except Exception as e:
             self.result_label.setText(f"An error occurred: {e}")
 
-    # Loads the map template and injects route data into it
+# =================================================================================
+# MAP LOADER
+# =================================================================================
+
+    """
+    Loads and displays the map in the QWebEngineView widget.
+    
+    It reads an HTML template file (`map_template.html`), injects JavaScript
+    code to draw the start/end markers and the route polyline, and then
+    renders the final HTML.
+    """
+
     def load_map(self, route_coords=None, start=None, end=None):
         route_js = ""
         if route_coords:
@@ -313,6 +373,19 @@ class RouteFinder(QWidget):
             self.map_view.setHtml(html)
         except Exception as e:
             QMessageBox.critical(self, "Map Load Error", f"Could not load map: {str(e)}")
+
+# =================================================================================
+# WEATHER FUNCTION
+# =================================================================================
+
+    """
+    Fetch weather for the destination using the Open-Meteo API.
+    
+    This method reads the user's selected temperature unit (Celsius/Fahrenheit),
+    queries the API for the destination's current weather, and updates the
+    weather label in the GUI.
+
+    """
 
     def get_weather(self, lat, lon):
         """Fetch weather for the destination using Open-Meteo API."""
@@ -339,6 +412,15 @@ class RouteFinder(QWidget):
             self.weather_label.setText("Weather: Could not retrieve data.")
             print(f"Weather API error: {e}")
 
+# =================================================================================
+# CLEAR FUNCTION
+# =================================================================================
+
+    """
+    Clears all input fields, results, and the map, resetting the UI
+    to its initial state. Triggered by the 'Clear' button.
+    """
+
     def clear_fields(self):
         self.entry_start.clear()
         self.entry_end.clear()
@@ -349,6 +431,10 @@ class RouteFinder(QWidget):
         self.result_label.setText("")
         self.table.setRowCount(0)
         self.load_map()
+
+# =================================================================================
+# DOWNLOAD FUNCTION
+# =================================================================================
 
     def download(self):
         # This function needs access to the UI elements
