@@ -41,9 +41,30 @@ def get_route():
         data = response.json()
 
         if "paths" in data:
-            distance = data["paths"][0]["distance"] / 1000
-            time = data["paths"][0]["time"] / 60000
-            result_text.set(f"Distance: {distance:.2f} km\nEstimated Time: {time:.2f} minutes")
+            distance = data["paths"][0]["distance"] / 1000  # in km
+            time = data["paths"][0]["time"] / 60000  # in minutes
+            
+            # --- START: New code for fuel cost calculation ---
+            results_str = f"Distance: {distance:.2f} km\nEstimated Time: {time:.2f} minutes"
+
+            if vehicle == 'car':
+                try:
+                    fuel_economy = float(entry_fuel_economy.get())
+                    fuel_price = float(entry_fuel_price.get())
+                    if fuel_economy <= 0:
+                        messagebox.showwarning("Input Error", "Fuel economy must be greater than zero.")
+                        return
+
+                    fuel_needed = distance / fuel_economy
+                    estimated_cost = fuel_needed * fuel_price
+                    results_str += f"\nEstimated Fuel Cost: ${estimated_cost:.2f}"
+
+                except ValueError:
+                    messagebox.showwarning("Input Error", "Please enter valid numbers for fuel economy and price.")
+                    return
+            
+            result_text.set(results_str)
+            # --- END: New code for fuel cost calculation ---
 
             clear_table()
             instructions = data["paths"][0]["instructions"]
@@ -66,13 +87,17 @@ def clear_fields():
     entry_start.delete(0, tk.END)
     entry_end.delete(0, tk.END)
     combo_vehicle.set("car")
+    # --- START: Clear new fuel fields ---
+    entry_fuel_economy.delete(0, tk.END)
+    entry_fuel_price.delete(0, tk.END)
+    # --- END: Clear new fuel fields ---
     result_text.set("")
     clear_table()
 
 # Main window
 root = tk.Tk()
 root.title("Route Finder")
-root.geometry("700x550")
+root.geometry("700x650") # Increased height for new fields
 root.resizable(False, False)
 
 frame = ttk.Frame(root, padding=10)
@@ -92,9 +117,19 @@ combo_vehicle = ttk.Combobox(frame, values=["car", "bike", "foot"], state="reado
 combo_vehicle.set("car")
 combo_vehicle.grid(row=2, column=1, pady=5)
 
+# --- START: New GUI fields for fuel cost ---
+ttk.Label(frame, text="Fuel Economy (km/L):").grid(row=3, column=0, sticky="w")
+entry_fuel_economy = ttk.Entry(frame, width=40)
+entry_fuel_economy.grid(row=3, column=1, pady=5)
+
+ttk.Label(frame, text="Fuel Price (per Liter):").grid(row=4, column=0, sticky="w")
+entry_fuel_price = ttk.Entry(frame, width=40)
+entry_fuel_price.grid(row=4, column=1, pady=5)
+# --- END: New GUI fields for fuel cost ---
+
 # Buttons
 btn_frame = ttk.Frame(frame)
-btn_frame.grid(row=3, column=0, columnspan=2, pady=10)
+btn_frame.grid(row=5, column=0, columnspan=2, pady=10) # Adjusted row
 
 ttk.Button(btn_frame, text="Get Route", command=get_route).pack(side="left", padx=5)
 ttk.Button(btn_frame, text="Clear", command=clear_fields).pack(side="left", padx=5)
@@ -103,11 +138,11 @@ ttk.Button(btn_frame, text="Download", command=lambda: download_route(entry_star
 # Result summary
 result_text = tk.StringVar()
 result_label = ttk.Label(frame, textvariable=result_text, foreground="blue", justify="left")
-result_label.grid(row=4, column=0, columnspan=2, pady=10)
+result_label.grid(row=6, column=0, columnspan=2, pady=10) # Adjusted row
 
 # Table container
 table_frame = ttk.Frame(frame)
-table_frame.grid(row=5, column=0, columnspan=2, pady=5)
+table_frame.grid(row=7, column=0, columnspan=2, pady=5) # Adjusted row
 
 scrollbar = ttk.Scrollbar(table_frame, orient="vertical")
 scrollbar.pack(side="right", fill="y")
