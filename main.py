@@ -57,7 +57,7 @@ def get_route():
 
                     fuel_needed = distance / fuel_economy
                     estimated_cost = fuel_needed * fuel_price
-                    results_str += f"\nEstimated Fuel Cost: ${estimated_cost:.2f}"
+                    results_str += f"\nEstimated Fuel Cost: Php {estimated_cost:.2f}"
 
                 except ValueError:
                     messagebox.showwarning("Input Error", "Please enter valid numbers for fuel economy and price.")
