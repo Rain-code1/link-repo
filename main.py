@@ -226,25 +226,28 @@ class RouteFinder(QWidget):
         except Exception as e:
             self.result_label.setText(f"An error occurred: {e}")
 
+    # Loads the map template and injects route data into it
     def load_map(self, route_coords=None, start=None, end=None):
         route_js = ""
         if route_coords:
-            route_js += f"var route = {json.dumps(route_coords)};\n"
-            route_js += "var polyline = L.polyline(route, {color: 'blue'}).addTo(map);\n"
-            route_js += "map.fitBounds(polyline.getBounds());\n"
+            route_js += f"""
+                var route = {json.dumps(route_coords)};
+                var polyline = L.polyline(route, {{color: 'blue'}}).addTo(map);
+                map.fitBounds(polyline.getBounds());
+            """
         if start and end:
-            # --- FIX START: Correctly format coordinates for JavaScript ---
-            route_js += f"L.marker([{start[0]}, {start[1]}]).addTo(map).bindPopup('Start').openPopup();\n"
-            route_js += f"L.marker([{end[0]}, {end[1]}]).addTo(map).bindPopup('End');\n"
-            # --- FIX END ---
+            route_js += f"""
+                L.marker([{start[0]}, {start[1]}]).addTo(map).bindPopup("Start").openPopup();
+                L.marker([{end[0]}, {end[1]}]).addTo(map).bindPopup("End");
+            """
 
         try:
-            # Assumes map_template.html is in the same directory
             with open("map_template.html", "r", encoding="utf-8") as file:
-                html = file.read().replace("// ROUTE_JS", route_js) # Ensure placeholder matches your HTML file
+                html = file.read()
+            html = html.replace("// ROUTE_JS will be injected here", route_js)
             self.map_view.setHtml(html)
-        except FileNotFoundError:
-             QMessageBox.critical(self, "Error", "map_template.html not found.")
+        except Exception as e:
+            QMessageBox.critical(self, "Map Load Error", f"Could not load map: {str(e)}")
 
 
     def clear_fields(self):
