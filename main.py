@@ -21,41 +21,70 @@ API_KEY = "2e2cf02b-63b2-456a-a2d1-e1d04d28d6d1"
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 
 # --- Helper Functions (from RouteOptimization.txt) ---
-def geocode(location: str):
-    url = f"https://graphhopper.com/api/1/geocode?q={urllib.parse.quote(location)}&limit=1&key={API_KEY}"
-    try:
-        r = requests.get(url, timeout=30)
-        r.raise_for_status()
-        data = r.json()
-        if data.get("hits"):
-            p = data["hits"][0]["point"]
-            return p["lat"], p["lng"]
-    except requests.RequestException as e:
-        print(f"Geocoding error: {e}")
-    return None, None
+def geocode(location_name: str):
+    """Validate location using GraphHopper API and return coordinates or an error."""
+    if not location_name.strip():
+        return None, "Location name cannot be empty."
 
-def call_route(start_lat, start_lng, end_lat, end_lng, vehicle, shortest=False):
+    params = {
+        "q": location_name,
+        "locale": "en",
+        "limit": 1,
+        "key": API_KEY
+    }
+    
+    try:
+        response = requests.get("https://graphhopper.com/api/1/geocode", params=params, timeout=30)
+        response.raise_for_status() # Will raise an exception for HTTP error codes
+    except requests.RequestException as e:
+        return None, f"API error: {e}"
+
+    data = response.json()
+    hits = data.get("hits", [])
+    if not hits:
+        return None, f"Invalid location: '{location_name}'. Please try again."
+
+    point = hits[0]["point"]
+    return (point["lat"], point["lng"]), None
+
+def call_route(start_lat, start_lng, end_lat, end_lng, vehicle, avoid_tolls=False):
     base = "https://graphhopper.com/api/1/route"
     params = [
         ("point", f"{start_lat},{start_lng}"),
         ("point", f"{end_lat},{end_lng}"),
         ("vehicle", vehicle),
         ("locale", "en"),
-        ("points_encoded", "true"), # Use encoded for smaller response
+        ("points_encoded", "true"),
         ("key", API_KEY),
     ]
-    if shortest:
+
+    if avoid_tolls:
+        # This parameter enables the custom_model feature
         params.append(("ch.disable", "true"))
-        params.append(("weighting", "shortest"))
 
-    r = requests.get(base, params=params, timeout=45)
 
-    if shortest and r.status_code != 200: # Fallback for unsupported shortest path
-        params = [p for p in params if p[0] not in ("ch.disable", "weighting")]
+        custom_model = {
+          "priority": [
+            {
+              "if": "toll == ALL",
+              "multiply_by": 0.1
+            }
+          ]
+        }
+        
+        params.append(("custom_model", json.dumps(custom_model)))
+
+    try:
         r = requests.get(base, params=params, timeout=45)
-
-    r.raise_for_status()
-    return r.json()
+        r.raise_for_status()
+        return r.json()
+    except requests.RequestException as e:
+        # This will now correctly catch and print the specific error from the API
+        print(f"API call error: {e}")
+        # It's helpful to also print the response text to see the exact error message
+        if e.response is not None:
+            print(f"API response: {e.response.text}")
+        return {}
 
 def estimate_fuel(distance_km: float, l_per_100: float):
     try:
@@ -94,9 +123,10 @@ class RouteFinder(QWidget):
         self.combo_vehicle.currentTextChanged.connect(self.on_vehicle_change)
         grid.addWidget(self.combo_vehicle, 2, 1)
 
-        grid.addWidget(QLabel("Optimization:"), 3, 0)
+        self.label_tolls = QLabel("Toll Roads:") # <-- Assign the label to self.label_tolls
+        grid.addWidget(self.label_tolls, 3, 0)   # <-- Use the new variable here
         self.combo_mode = QComboBox()
-        self.combo_mode.addItems(["Fastest", "Fuel-Efficient"])
+        self.combo_mode.addItems(["Use Toll Roads", "Avoid Toll Roads"])
         grid.addWidget(self.combo_mode, 3, 1)
 
         self.label_fuel_economy = QLabel("Car L/100 km:")
@@ -196,6 +226,8 @@ class RouteFinder(QWidget):
         self.entry_fuel_economy.setVisible(is_car)
         self.label_fuel_price.setVisible(is_car)
         self.entry_fuel_price.setVisible(is_car)
+        self.label_tolls.setVisible(is_car)
+        self.combo_mode.setVisible(is_car)
         self.combo_mode.setEnabled(is_car) # Optimization only for car
 
     def get_route(self):
@@ -203,29 +235,32 @@ class RouteFinder(QWidget):
         end = self.entry_end.text().strip()
         vehicle = self.combo_vehicle.currentText()
         mode = self.combo_mode.currentText()
-
-        if not start or not end:
-            QMessageBox.warning(self, "Input Error", "Please enter both start and destination.")
+        
+        start_coords, error_start = geocode(start)
+        if error_start:
+            QMessageBox.critical(self, "Input Error", f"Starting Location Error: {error_start}")
             return
 
+        end_coords, error_end = geocode(end)
+        if error_end:
+            QMessageBox.critical(self, "Input Error", f"Destination Error: {error_end}")
+            return
+
+        start_lat, start_lng = start_coords
+        end_lat, end_lng = end_coords
+
         try:
-            start_lat, start_lng = geocode(start)
-            end_lat, end_lng = geocode(end)
+            # Check the user's choice for toll roads
+            avoid_tolls = (mode == "Avoid Toll Roads")
+            
+            # Call the updated routing function
+            data = call_route(start_lat, start_lng, end_lat, end_lng, vehicle, avoid_tolls=avoid_tolls)
 
-            if start_lat is None or end_lat is None:
-                self.result_label.setText("Error: Could not geocode one of the locations.")
-                self.table.setRowCount(0)
-                return
-
-            shortest = (mode == "Fuel-Efficient")
-            data = call_route(start_lat, start_lng, end_lat, end_lng, vehicle, shortest)
-
-            if "paths" in data:
+            if "paths" in data and data["paths"]:
                 path = data["paths"][0]
                 distance = path["distance"] / 1000
                 time = path["time"] / 60000
 
-                # Fuel and cost calculation
                 fuel_text = ""
                 if vehicle == "car":
                     fuel_l = estimate_fuel(distance, self.entry_fuel_economy.text())
@@ -237,27 +272,20 @@ class RouteFinder(QWidget):
                         except ValueError:
                             fuel_text = "\nInvalid fuel price."
 
-                self.result_label.setText(f"<b>{mode} Route</b>\nDistance: {distance:.2f} km\nEstimated Time: {time:.1f} minutes{fuel_text}")
-
+                # Update the result label to show the toll preference
+                label = "Route (Avoiding Tolls)" if avoid_tolls else "Route (Using Tolls)"
+                self.result_label.setText(f"<b>{label}</b>\nDistance: {distance:.2f} km\nEstimated Time: {time:.1f} minutes{fuel_text}")
+                
                 instructions = path["instructions"]
                 self.table.setRowCount(len(instructions))
                 for i, step in enumerate(instructions):
-                    # Step column (center aligned)
-                    step_item = QTableWidgetItem(str(i + 1))
-                    step_item.setTextAlignment(Qt.AlignCenter)
-                    self.table.setItem(i, 0, step_item)
-
-                    # Instruction column (default left alignment)
+                    self.table.setItem(i, 0, QTableWidgetItem(str(i + 1)))
                     self.table.setItem(i, 1, QTableWidgetItem(step["text"]))
-
-                    # Distance column (center aligned with "km")
-                    dist_item = QTableWidgetItem(f"{step['distance'] / 1000:.2f} km")
-                    dist_item.setTextAlignment(Qt.AlignCenter)
-                    self.table.setItem(i, 2, dist_item)
+                    self.table.setItem(i, 2, QTableWidgetItem(f"{step['distance'] / 1000:.2f}"))
 
                 coords = polyline.decode(path["points"])
                 self.load_map(coords, (start_lat, start_lng), (end_lat, end_lng))
-                self.get_weather(end_lat, end_lng) 
+                self.get_weather(end_lat, end_lng)
             else:
                 self.result_label.setText("Error: Could not find a route.")
         except Exception as e:
