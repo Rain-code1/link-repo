@@ -1,3 +1,9 @@
+import os
+import sys
+
+# Ensure the project root (where main.py lives) is on sys.path
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
 import main
 
 # -----------------------------
