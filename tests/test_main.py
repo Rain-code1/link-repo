@@ -6,7 +6,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import logic
 
-
 # -----------------------------
 # Tests for estimate_fuel
 # -----------------------------
@@ -111,3 +110,59 @@ def test_call_route_success(monkeypatch):
     assert len(result["paths"]) == 1
     assert result["paths"][0]["distance"] == 10000
     assert result["paths"][0]["time"] == 600000
+
+
+# -----------------------------
+# Extra tests for bike/foot modes
+# -----------------------------
+
+def _capture_request(monkeypatch):
+    """
+    Helper to capture the URL and params passed to requests.get
+    inside logic.call_route, so we can verify the vehicle type.
+    """
+    captured = {}
+
+    def fake_get(url, params=None, timeout=None):
+        captured["url"] = url
+        captured["params"] = params or []
+        captured["timeout"] = timeout
+
+        class FakeResp:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                # Minimal valid response for our purposes
+                return {"paths": []}
+
+        return FakeResp()
+
+    monkeypatch.setattr(logic.requests, "get", fake_get)
+    return captured
+
+
+def test_call_route_uses_bike_vehicle(monkeypatch):
+    """
+    Ensure that when vehicle='bike', we actually send ?vehicle=bike
+    to the GraphHopper API.
+    """
+    captured = _capture_request(monkeypatch)
+
+    logic.call_route(14.0, 121.0, 14.5, 121.1, "bike", avoid_tolls=False)
+
+    vehicles = [v for (k, v) in captured["params"] if k == "vehicle"]
+    assert vehicles == ["bike"]
+
+
+def test_call_route_uses_foot_vehicle(monkeypatch):
+    """
+    Ensure that when vehicle='foot', we actually send ?vehicle=foot
+    to the GraphHopper API.
+    """
+    captured = _capture_request(monkeypatch)
+
+    logic.call_route(14.0, 121.0, 14.5, 121.1, "foot", avoid_tolls=False)
+
+    vehicles = [v for (k, v) in captured["params"] if k == "vehicle"]
+    assert vehicles == ["foot"]

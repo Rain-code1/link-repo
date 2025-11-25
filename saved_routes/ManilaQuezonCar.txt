@@ -1,0 +1,32 @@
+Route Information
+=================
+Start          : Manila
+End            : Quezon City
+Vehicle        : car
+Toll Mode      : Use Toll Roads
+Weather Status : Weather at Destination: 27.1°C
+
+Route Summary
+-------------
+Route (Using Tolls)
+Distance: 12.88 km
+Estimated Time: 20.5 minutes
+Estimated Fuel: 1.03 L | Est. Cost: ₱77.30
+
+Step-by-Step Directions:
+-------------------------
+Step   Instruction                                                  Distance (km)
+================================================================================
+1      Continue onto Victoria Street                                      0.02
+2      Turn sharp right onto Padre Burgos Avenue                          0.04
+3      Keep left onto Taft Avenue                                         0.48
+4      Turn sharp right onto Finance Road                                 0.25
+5      Turn right onto Padre Burgos Avenue                                0.77
+6      Keep right onto Quezon Boulevard                                   3.88
+7      At roundabout, take exit 3 onto Quezon Avenue                      4.52
+8      Keep left onto Quezon Avenue                                       1.52
+9      Continue onto Quezon Avenue                                        0.95
+10     Keep left                                                          0.07
+11     Keep left                                                          0.20
+12     At roundabout, take exit 3                                         0.17
+13     Arrive at destination                                              0.00
